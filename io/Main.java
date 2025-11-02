@@ -104,12 +104,19 @@ public class Main {
         final long[] decompressTimes;
         final double nsPerGet;
         final boolean validationOk;
+        final double compressionRatio; 
+        final long originalSizeBytes;
+        final long compressedSizeBytes;
         
-        BenchmarkResults(long[] compressTimes, long[] decompressTimes, double nsPerGet, boolean validationOk) {
+        BenchmarkResults(long[] compressTimes, long[] decompressTimes, double nsPerGet, boolean validationOk, 
+                        double compressionRatio, long originalSizeBytes, long compressedSizeBytes) {
             this.compressTimes = compressTimes;
             this.decompressTimes = decompressTimes;
             this.nsPerGet = nsPerGet;
             this.validationOk = validationOk;
+            this.compressionRatio = compressionRatio;
+            this.originalSizeBytes = originalSizeBytes;
+            this.compressedSizeBytes = compressedSizeBytes;
         }
     }
     
@@ -176,7 +183,13 @@ public class Main {
             UI.println("│                                                      │");
             UI.println("└──────────────────────────────────────────────────────┘");
             
-            return new BenchmarkResults(compressTimes, decompressTimes, nsPerGet, validationOk);
+            // Calcul du taux de compression
+            long originalSizeBytes = (long) data.length * 4L; // 4 bytes par int
+            long compressedSizeBytes = (long) compressed.length * 4L; // 4 bytes par int
+            double compressionRatio = (double) originalSizeBytes / compressedSizeBytes;
+            
+            return new BenchmarkResults(compressTimes, decompressTimes, nsPerGet, validationOk, 
+                                       compressionRatio, originalSizeBytes, compressedSizeBytes);
         }
         
         private static long[] benchmarkCompression(IntCompressor compressor, int[] data, BenchmarkConfig config) {
@@ -234,8 +247,6 @@ public class Main {
             
             // Formater le nombre de queries avec un padding adapté
             String queriesStr = String.format("%,d", queries);
-            int padding = 55 - 35 - queriesStr.length(); // 55 = largeur totale, 35 = texte fixe
-            String spaces = " ".repeat(Math.max(0, padding));
             UI.println("│  📊 Mesure get(i) aléatoires (" + queriesStr + " accès)...       │");
             
             // Warmup
@@ -394,6 +405,25 @@ public class Main {
             println("│  Compression         : " + padRight(FormatHelper.prettyNs(FormatHelper.median(results.compressTimes)), DISPLAY_WIDTH) + "   │");
             println("│  Décompression       : " + padRight(FormatHelper.prettyNs(FormatHelper.median(results.decompressTimes)), DISPLAY_WIDTH) + "   │");
             println("│  Accès get(i)        : " + padRight(String.format(Locale.ROOT, "%.2f ns/accès", results.nsPerGet), DISPLAY_WIDTH) + "   │");
+            println("│                                                       │");
+            println("└───────────────────────────────────────────────────────┘");
+            
+            // Compression
+            println("\n┌─ COMPRESSION ─────────────────────────────────────────┐");
+            println("│                                                       │");
+            println("│  Taille originale    : " + padRight(String.format(Locale.ROOT, "%,d octets", results.originalSizeBytes), DISPLAY_WIDTH) + "   │");
+            println("│  Taille compressée   : " + padRight(String.format(Locale.ROOT, "%,d octets", results.compressedSizeBytes), DISPLAY_WIDTH) + "   │");
+            println("│  Ratio de compression: " + padRight(String.format(Locale.ROOT, "%.3fx", results.compressionRatio), DISPLAY_WIDTH) + "   │");
+            
+            // Calcul intelligent de l'économie/surcoût d'espace
+            if (results.compressionRatio >= 1.0) {
+                double savings = (1.0 - 1.0/results.compressionRatio) * 100;
+                println("│  Économie d'espace   : " + padRight(String.format(Locale.ROOT, "%.1f%%", savings), DISPLAY_WIDTH) + "   │");
+            } else {
+                double overhead = (1.0/results.compressionRatio - 1.0) * 100;
+                println("│  Surcoût d'espace    : " + padRight(String.format(Locale.ROOT, "+%.1f%%", overhead), DISPLAY_WIDTH) + "   │");
+            }
+            
             println("│                                                       │");
             println("└───────────────────────────────────────────────────────┘");
             

@@ -74,9 +74,9 @@ public final class AutomatedBenchmark {
         final int queries = 1_000_000;
 
         System.out.printf("%n-- Scénario: %s --%n", name);
-        System.out.printf("%-12s | %-12s | %-12s | %-14s | %-12s%n",
-                "Stratégie", "Comp", "Decomp", "Get (ns/op)", "Taille");
-        System.out.println("--------------------------------------------------------------------------------");
+        System.out.printf("%-12s | %-12s | %-12s | %-14s | %-12s | %-12s%n",
+                "Stratégie", "Comp", "Decomp", "Get (ns/op)", "Taille", "Ratio");
+        System.out.println("----------------------------------------------------------------------------------------------------------");
 
         for (CompressionType type : new CompressionType[]{
                 CompressionType.CROSSING,
@@ -132,18 +132,21 @@ public final class AutomatedBenchmark {
             long t1 = System.nanoTime();
             double getAvgNs = (double) (t1 - t0) / queries;
 
-            // Final compressed size (bytes)
-            long sizeBytes = (long) compressed.length * 4L;
+            // Final compressed size (bytes) and compression ratio
+            long originalSizeBytes = (long) data.length * 4L; // 4 bytes per int
+            long compressedSizeBytes = (long) compressed.length * 4L; // 4 bytes per int
+            double compressionRatio = (double) originalSizeBytes / compressedSizeBytes;
 
             // Print row
             System.out.printf(
                     Locale.ROOT,
-                    "%-12s | %-12s | %-12s | %14.2f | %12s%n",
+                    "%-12s | %-12s | %-12s | %14.2f | %12s | %12s%n",
                     typeToLabel(type),
                     prettyNs(compMed),
                     prettyNs(decompMed),
                     getAvgNs,
-                    String.format(Locale.ROOT, "%,d B", sizeBytes)
+                    String.format(Locale.ROOT, "%,d B", compressedSizeBytes),
+                    String.format(Locale.ROOT, "%.3fx", compressionRatio)
             );
 
             // small usage of checksum to avoid dead code elimination
@@ -212,28 +215,28 @@ Ce benchmark met en évidence les forces et faiblesses des trois stratégies :
 
 1) Uniformes (k=9, 32%9!=0)
    - NoOverlap : simple et accès get rapides (un seul mot), mais gaspille des bits
-     de padding car 32 n'est pas multiple de 9 → taille plus grande.
+     de padding car 32 n'est pas multiple de 9 → taille plus grande, ratio plus faible.
    - Overlap (Crossing) : packe sans padding, meilleure compaction → taille plus petite,
-     mais get peut être un peu plus complexe si une valeur chevauche 2 mots.
+     ratio de compression supérieur, mais get peut être un peu plus complexe.
    - Overflow : peu d'intérêt ici (pas d'outliers), taille similaire à Overlap/NoOverlap
-     selon l'implémentation; timings proches.
+     selon l'implémentation; ratio et timings proches.
 
 2) Uniformes (k=8, parfait)
-   - NoOverlap : cas idéal, 4 valeurs par mot, zéro padding → très bonne taille et
-     get très rapide (un seul mot).
-   - Overlap : similaire en taille (pas de besoin de chevauchement), coûts comparables.
-   - Overflow : surcoût d'en-tête et structure non nécessaire → taille/timing un peu moins bons.
+   - NoOverlap : cas idéal, 4 valeurs par mot, zéro padding → très bonne taille, 
+     excellent ratio de compression et get très rapide (un seul mot).
+   - Overlap : similaire en taille et ratio (pas de besoin de chevauchement), coûts comparables.
+   - Overflow : surcoût d'en-tête → ratio plus faible et timing un peu moins bons.
 
 3) Outliers (1%, base k~6, outliers ~20 bits)
    - Overflow : conçu pour ce cas; petites valeurs en ligne, outliers déportés dans
-     une zone dédiée → excellente taille et souvent de bons temps.
+     une zone dédiée → excellente taille et MEILLEUR ratio de compression pour ce type de données.
    - Overlap : packe tous les bits indistinctement → la présence d'outliers augmente
-     la largeur effective, taille finale plus grande que Overflow.
+     la largeur effective, taille finale plus grande que Overflow, ratio plus faible.
    - NoOverlap : combine padding + large k effectif si homogénéisé → risque de taille
-     la plus élevée; get reste simple/rapide.
+     la plus élevée et ratio le plus faible; get reste simple/rapide.
 
 En résumé :
 - NoOverlap brille quand 32 est multiple de k et pour les accès aléatoires.
 - Overlap tend à mieux compacter quand 32%k!=0 (moins de padding).
-- Overflow excelle quand une petite fraction d'outliers gonfle la distribution.
+- Overflow excelle pour les datasets avec outliers → meilleur ratio de compression.
 */
