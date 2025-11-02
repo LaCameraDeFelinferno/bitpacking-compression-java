@@ -1,5 +1,7 @@
 # Projet de Compression BitPacking Java
 
+Projet Universitaire de M. BENADY Semy pour l'Université Côte d'Azur, UE Génie Logiciel et Projet DEV de M. J.C. Régin. 
+
 Ce projet est une bibliothèque Java performante pour la compression de tableaux d'entiers (`int[]`), conçue pour optimiser l'espace de stockage tout en conservant un accès direct (aléatoire) aux données.
 
 ## 🎯 Stratégies de Compression
@@ -148,4 +150,3 @@ Testing OVERFLOW
   sample get() OK: true
 Smoke test done.
 ```
-Projet Universitaire de M. BENADY Semy pour l'Université Côte d'Azur, UE Génie Logiciel et Projet DEV de M. J.C. Régin. 
